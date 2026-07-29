@@ -1,6 +1,8 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import jakarta.validation.constraints.Positive;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +18,7 @@ import ru.yandex.practicum.filmorate.service.FilmService;
 import java.util.List;
 
 @Slf4j
+@Validated
 @RestController
 @RequestMapping("/films")
 public class FilmController {
@@ -41,17 +44,17 @@ public class FilmController {
 	}
 
 	@GetMapping("/{id}")
-	public Film getFilmById(@PathVariable final int id) {
+	public Film getFilmById(@PathVariable @Positive final int id) {
 		return filmService.getById(id);
 	}
 
 	@PutMapping("/{id}/like/{userId}")
-	public void addLike(@PathVariable final int id, @PathVariable final int userId) {
+	public void addLike(@PathVariable @Positive final int id, @PathVariable @Positive final int userId) {
 		filmService.addLike(id, userId);
 	}
 
 	@DeleteMapping("/{id}/like/{userId}")
-	public void removeLike(@PathVariable final int id, @PathVariable final int userId) {
+	public void removeLike(@PathVariable @Positive final int id, @PathVariable @Positive final int userId) {
 		filmService.removeLike(id, userId);
 	}
 

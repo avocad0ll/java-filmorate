@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.model.FriendshipStatus;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
 
@@ -36,8 +37,12 @@ public class UserService {
 	public void addFriend(final int userId, final int friendId) {
 		User user = userStorage.getById(userId);
 		User friend = userStorage.getById(friendId);
-		user.getFriends().add(friendId);
-		friend.getFriends().add(userId);
+		if (friend.getFriends().containsKey(userId)) {
+			user.getFriends().put(friendId, FriendshipStatus.CONFIRMED);
+			friend.getFriends().put(userId, FriendshipStatus.CONFIRMED);
+		} else {
+			user.getFriends().put(friendId, FriendshipStatus.UNCONFIRMED);
+		}
 		log.info("Пользователи {} и {} теперь друзья", userId, friendId);
 	}
 
@@ -52,7 +57,7 @@ public class UserService {
 	public List<User> getFriends(final int userId) {
 		User user = userStorage.getById(userId);
 		List<User> friends = new ArrayList<>();
-		for (int friendId : user.getFriends()) {
+		for (int friendId : user.getFriends().keySet()) {
 			friends.add(userStorage.getById(friendId));
 		}
 		return friends;
@@ -62,8 +67,8 @@ public class UserService {
 		User user = userStorage.getById(userId);
 		User other = userStorage.getById(otherId);
 		List<User> common = new ArrayList<>();
-		for (int friendId : user.getFriends()) {
-			if (other.getFriends().contains(friendId)) {
+		for (int friendId : user.getFriends().keySet()) {
+			if (other.getFriends().containsKey(friendId)) {
 				common.add(userStorage.getById(friendId));
 			}
 		}

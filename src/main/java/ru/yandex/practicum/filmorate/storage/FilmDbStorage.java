@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.storage;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -14,10 +15,13 @@ import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.validation.FilmValidator;
 
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -139,7 +143,7 @@ public class FilmDbStorage implements FilmStorage {
 				"SELECT f.id, f.name, f.description, f.release_date, f.duration, f.mpa_id, r.name AS mpa_name "
 						+ "FROM films f LEFT JOIN mpa_ratings r ON f.mpa_id = r.id ORDER BY f.id",
 				FILM_MAPPER);
-		films.forEach(this::loadGenres);
+		loadGenresForFilms(films);
 		return films;
 	}
 
@@ -173,7 +177,7 @@ public class FilmDbStorage implements FilmStorage {
 						+ "GROUP BY f.id, f.name, f.description, f.release_date, f.duration, f.mpa_id, r.name "
 						+ "ORDER BY likes_count DESC LIMIT ?",
 				FILM_MAPPER, count);
-		films.forEach(this::loadGenres);
+		loadGenresForFilms(films);
 		return films;
 	}
 
@@ -187,10 +191,24 @@ public class FilmDbStorage implements FilmStorage {
 				uniqueGenres.putIfAbsent(genre.getId(), genre);
 			}
 		}
-		for (Genre genre : uniqueGenres.values()) {
-			jdbcTemplate.update("INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)",
-					film.getId(), genre.getId());
+		if (uniqueGenres.isEmpty()) {
+			return;
 		}
+		List<Integer> genreIds = new ArrayList<>(uniqueGenres.keySet());
+		jdbcTemplate.batchUpdate(
+				"INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)",
+				new BatchPreparedStatementSetter() {
+					@Override
+					public void setValues(final PreparedStatement ps, final int i) throws SQLException {
+						ps.setInt(1, film.getId());
+						ps.setInt(2, genreIds.get(i));
+					}
+
+					@Override
+					public int getBatchSize() {
+						return genreIds.size();
+					}
+				});
 	}
 
 	private void loadGenres(final Film film) {
@@ -199,6 +217,30 @@ public class FilmDbStorage implements FilmStorage {
 						+ "JOIN genres g ON fg.genre_id = g.id WHERE fg.film_id = ? ORDER BY g.id",
 				GENRE_MAPPER, film.getId());
 		film.setGenres(new ArrayList<>(genres));
+	}
+
+	private void loadGenresForFilms(final List<Film> films) {
+		if (films.isEmpty()) {
+			return;
+		}
+		List<Integer> filmIds = new ArrayList<>();
+		for (Film film : films) {
+			filmIds.add(film.getId());
+		}
+		String placeholders = String.join(",", Collections.nCopies(filmIds.size(), "?"));
+		Map<Integer, List<Genre>> genresByFilm = new HashMap<>();
+		jdbcTemplate.query(
+				"SELECT fg.film_id, g.id, g.name FROM film_genres fg "
+						+ "JOIN genres g ON fg.genre_id = g.id "
+						+ "WHERE fg.film_id IN (" + placeholders + ") ORDER BY g.id",
+				rs -> {
+					int filmId = rs.getInt("film_id");
+					genresByFilm.computeIfAbsent(filmId, k -> new ArrayList<>()).add(GENRE_MAPPER.mapRow(rs, 0));
+				},
+				filmIds.toArray());
+		for (Film film : films) {
+			film.setGenres(new ArrayList<>(genresByFilm.getOrDefault(film.getId(), Collections.emptyList())));
+		}
 	}
 
 	private void loadMpa(final Film film) {

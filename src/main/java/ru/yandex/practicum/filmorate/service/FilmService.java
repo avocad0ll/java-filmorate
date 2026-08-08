@@ -3,6 +3,7 @@ package ru.yandex.practicum.filmorate.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.storage.FilmStorage;
@@ -11,6 +12,8 @@ import ru.yandex.practicum.filmorate.storage.MpaStorage;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -44,10 +47,13 @@ public class FilmService {
 		if (film.getMpa() != null) {
 			mpaStorage.getById(film.getMpa().getId());
 		}
-		if (film.getGenres() != null) {
+		if (film.getGenres() != null && !film.getGenres().isEmpty()) {
+			Set<Integer> existingGenreIds = genreStorage.getAll().stream()
+					.map(Genre::getId)
+					.collect(Collectors.toSet());
 			for (Genre genre : film.getGenres()) {
-				if (genre != null) {
-					genreStorage.getById(genre.getId());
+				if (genre != null && !existingGenreIds.contains(genre.getId())) {
+					throw new NotFoundException("Жанр с ID " + genre.getId() + " не найден");
 				}
 			}
 		}

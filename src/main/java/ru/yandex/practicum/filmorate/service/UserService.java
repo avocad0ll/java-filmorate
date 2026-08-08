@@ -37,12 +37,8 @@ public class UserService {
 	public void addFriend(final int userId, final int friendId) {
 		User user = userStorage.getById(userId);
 		User friend = userStorage.getById(friendId);
-		if (friend.getFriends().containsKey(userId)) {
-			user.getFriends().put(friendId, FriendshipStatus.CONFIRMED);
-			friend.getFriends().put(userId, FriendshipStatus.CONFIRMED);
-		} else {
-			user.getFriends().put(friendId, FriendshipStatus.UNCONFIRMED);
-		}
+		user.getFriends().put(friendId, FriendshipStatus.CONFIRMED);
+		friend.getFriends().put(userId, FriendshipStatus.CONFIRMED);
 		log.info("Пользователи {} и {} теперь друзья", userId, friendId);
 	}
 
